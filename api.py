@@ -10,6 +10,7 @@ app = FastAPI(title="WhatsApp AI Assistant", version="1.0.0")
 class WhatsAppMessage(BaseModel):
     user_id: int
     message: str
+    chat_history: Optional[str] = ""
 
 @app.post("/process_whatsapp_message")
 async def process_whatsapp_message(request: WhatsAppMessage):
@@ -38,7 +39,7 @@ async def process_whatsapp_message(request: WhatsAppMessage):
         
         # Processa os chunks relevantes
         chunks = find_relevant_chunks_from_json(response.data[0]["pdf_vector"], request.message, 3)
-        response_gemini = generate_response_with_gemini(chunks, request.message)
+        response_gemini = generate_response_with_gemini(chunks, request.message, request.chat_history)
         
         return {           
             "response_gemini": response_gemini
