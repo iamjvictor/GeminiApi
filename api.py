@@ -21,7 +21,7 @@ async def process_whatsapp_message(request: WhatsAppMessage):
                 detail="Supabase não configurado. Configure as variáveis SUPABASE_URL e SUPABASE_KEY no arquivo .env"
             )
 
-        # Busca dados do usuário no Supabase
+        # Busca dados do usuário no Supabase usando UUID
         response = (
             supabase.table("users")
             .select("pdf_vector")
@@ -61,6 +61,3 @@ async def health_check():
         "service": "WhatsApp AI Assistant",
         "supabase_configured": supabase is not None
     }
-
-
-
