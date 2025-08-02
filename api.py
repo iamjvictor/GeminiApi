@@ -13,21 +13,40 @@ class WhatsAppMessage(BaseModel):
 
 @app.post("/process_whatsapp_message")
 async def process_whatsapp_message(request: WhatsAppMessage):
-
-    response = (
-        supabase.table("user_data")
-        .select("pdf_vector")
-        .eq("id", request.user_id)
-        .execute()
-    )
-    chunks = find_relevant_chunks_from_json(response.data[0]["pdf_vector"], request.message, 3)
-    response_gemini = generate_response_with_gemini(chunks, request.message)
     try:
-        # Retorna os dados recebidos
+        # Verifica se o Supabase está configurado
+        if supabase is None:
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase não configurado. Configure as variáveis SUPABASE_URL e SUPABASE_KEY no arquivo .env"
+            )
+
+        # Busca dados do usuário no Supabase
+        response = (
+            supabase.table("users")
+            .select("pdf_vector")
+            .eq("id", request.user_id)
+            .execute()
+        )
+        
+        # Verifica se encontrou dados para o usuário
+        if not response.data:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Usuário com ID {request.user_id} não encontrado"
+            )
+        
+        # Processa os chunks relevantes
+        chunks = find_relevant_chunks_from_json(response.data[0]["pdf_vector"], request.message, 3)
+        response_gemini = generate_response_with_gemini(chunks, request.message)
+        
         return {           
             "response_gemini": response_gemini
         }
         
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -37,7 +56,11 @@ async def process_whatsapp_message(request: WhatsAppMessage):
 @app.get("/health")
 async def health_check():
     """Endpoint para verificar se a API está funcionando."""
-    return {"status": "healthy", "service": "WhatsApp AI Assistant"}
+    return {
+        "status": "healthy", 
+        "service": "WhatsApp AI Assistant",
+        "supabase_configured": supabase is not None
+    }
 
 
 

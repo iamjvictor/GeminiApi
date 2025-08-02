@@ -6,12 +6,11 @@ load_dotenv()
 
 url: str = os.getenv("SUPABASE_URL")
 key: str = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
 
-response = (
-    supabase.table("user_data")
-    .select("pdf_vector")
-    .eq("id", 1)
-    .execute()
-)
+# Verifica se as variáveis de ambiente estão configuradas
+if not url or not key:
+    print("⚠️  Aviso: Variáveis SUPABASE_URL e SUPABASE_KEY não configuradas no arquivo .env")
+    print("A API funcionará apenas para testes básicos.")
+
+supabase: Client = create_client(url, key) if url and key else None
 
