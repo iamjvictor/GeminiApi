@@ -1,6 +1,7 @@
 from dotenv import load_dotenv # Função para carregar variáveis de ambiente de um arquivo .env.
 import google.generativeai as genai # Biblioteca do Google para interagir com os modelos de IA generativa (Gemini).
 import os
+import json
 
 load_dotenv() # Carrega as variáveis de ambiente definidas no arquivo .env para o ambiente atual.
 api_key = os.getenv('GOOGLE_API_KEY') # Obtém o valor da variável de ambiente 'GOOGLE_API_KEY'.
@@ -126,15 +127,18 @@ def process_google_event(payload: dict) -> dict:
 
             response = generative_model_instance.generate_content(prompt)
             # Limpa a resposta para garantir que seja um JSON válido
-                cleaned_response_text = response.text.strip().replace('```json', '').replace('```', '')
+            cleaned_response_text = response.text.strip().replace('```json', '').replace('```', '')
                 
-                print("--- RESPOSTA DA IA (JSON Mastigado) ---")
-                print(cleaned_response_text)
-                print("--------------------------------------")
+            print("--- RESPOSTA DA IA (JSON Mastigado) ---")
+            print(cleaned_response_text)
+            print("--------------------------------------")
                 
-                # 3. CONVERTE A RESPOSTA DE TEXTO PARA UM DICIONÁRIO PYTHON
-                processed_data = json.loads(cleaned_response_text)
-                return processed_data
+            # 3. CONVERTE A RESPOSTA DE TEXTO PARA UM DICIONÁRIO PYTHON
+            processed_data = json.loads(cleaned_response_text)
+            print("--- DADOS PROCESSADOS ---")
+            print(processed_data)
+            print("-------------------------")
+            return processed_data
     except Exception as e:
         print(f"Erro ao processar evento do Google Calendar: {e}")
         return {

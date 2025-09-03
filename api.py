@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from database import supabase
 from gemini import generate_response_with_gemini
+from gemini import process_google_event
 from ExtractFromFile import find_relevant_chunks_from_json
 
 app = FastAPI(title="WhatsApp AI Assistant", version="1.0.0")
@@ -65,14 +66,17 @@ async def health_check():
 
 
 @app.post("/handleWebhook")
-async def handle_webhook(promptPayload: dict):
+def handle_webhook(promptPayload: dict):
     """
     Endpoint para lidar com eventos do Google Calendar.
     """
     try:
         # Chama a função que processa o evento
-        response = await process_google_event(promptPayload)
-        return response
+        response = process_google_event(promptPayload)
+        return {
+            "status": "success",
+            "response": response
+        }
     except Exception as e:
         raise HTTPException(
             status_code=500,
