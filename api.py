@@ -62,3 +62,19 @@ async def health_check():
         "service": "WhatsApp AI Assistant",
         "supabase_configured": supabase is not None
     }
+
+
+@app.post("/handleWebhook")
+async def handle_webhook(promptPayload: dict):
+    """
+    Endpoint para lidar com eventos do Google Calendar.
+    """
+    try:
+        # Chama a função que processa o evento
+        response = await process_google_event(promptPayload)
+        return response
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao processar webhook: {str(e)}"
+        )

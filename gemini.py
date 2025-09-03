@@ -69,3 +69,76 @@ def generate_response_with_gemini(relevant_chunks, user_question, chat_history="
     except Exception as e:
         print(f"Erro ao gerar resposta com Gemini: {e}")
         return "Desculpe, ocorreu um erro ao processar sua pergunta. Tente novamente."
+
+
+
+def process_google_event(payload: dict) -> dict:
+    """
+    Processa o evento recebido do Google Calendar e gera uma resposta usando o modelo Gemini.
+    
+    Args:
+        promptPayload (dict): Payload do evento do Google Calendar
+    
+    Returns:
+        dict: Resposta gerada pelo modelo Gemini
+    """
+    try:
+       # Extrai os dados do payload recebido do seu backend Node.js
+            event = payload.get('event', {})
+            user = payload.get('user', {})
+            available_rooms = user.get('availableRooms', [])
+
+            # 1. MONTAGEM DO PROMPT PARA A IA
+            # Este prompt é a "alma" da sua lógica de tradução.
+            prompt = f"""
+            Você é um assistente especialista em processar dados de reservas de hotel para um sistema de automação.
+            Analise os dados de um evento do Google Calendar e a lista de quartos disponíveis para extrair informações em um formato JSON específico.
+
+            **Dados do Evento Recebido:**
+            - Título (summary): "{event.get('summary', '')}"
+            - Descrição (description): "{event.get('description', '')}"
+            - Data de Início: "{event.get('start', '')}"
+            - Data de Fim: "{event.get('end', '')}"
+
+            **Lista de Nomes de Quartos Válidos neste Hotel:**
+            - {', '.join(available_rooms)}
+
+            **Sua Tarefa:**
+            Baseado nos dados acima, retorne um objeto JSON contendo as seguintes chaves. Se uma informação não puder ser extraída, retorne null para o campo correspondente.
+            1.  "roomName": A partir do Título do evento, identifique o nome do quarto mais provável da lista de quartos válidos.
+            2.  "leadName": A partir da Descrição ou do Título, extraia o nome completo do hóspede.
+            3.  "leadEmail": Extraia o endereço de e-mail do hóspede da Descrição.
+            4.  "leadWhatsapp": Extraia um número de telefone no formato WhatsApp (apenas dígitos) da Descrição.
+            
+            Responda APENAS com o objeto JSON. Não inclua texto adicional ou formatação.
+            Exemplo de resposta:
+            {{
+            "roomName": "Suíte Master",
+            "leadName": "Ana Clara Medeiros",
+            "leadEmail": "anaclara.medeiros@example.com",
+            "leadWhatsapp": "5521987654321"
+            }}
+            """
+
+            print("--- PROMPT ENVIADO PARA A IA ---")
+            print(prompt)
+            print("-------------------------------")
+
+            response = generative_model_instance.generate_content(prompt)
+            # Limpa a resposta para garantir que seja um JSON válido
+                cleaned_response_text = response.text.strip().replace('```json', '').replace('```', '')
+                
+                print("--- RESPOSTA DA IA (JSON Mastigado) ---")
+                print(cleaned_response_text)
+                print("--------------------------------------")
+                
+                # 3. CONVERTE A RESPOSTA DE TEXTO PARA UM DICIONÁRIO PYTHON
+                processed_data = json.loads(cleaned_response_text)
+                return processed_data
+    except Exception as e:
+        print(f"Erro ao processar evento do Google Calendar: {e}")
+        return {
+            "response_gemini": "Desculpe, ocorreu um erro ao processar o evento. Tente novamente."
+        }
+    
+    
