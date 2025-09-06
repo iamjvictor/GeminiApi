@@ -1,19 +1,30 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, status, Depends
 from pydantic import BaseModel
 from typing import Optional
 from database import supabase
 from gemini import generate_response_with_gemini
 from gemini import process_google_event
 from ExtractFromFile import find_relevant_chunks_from_json
+import os
 
 app = FastAPI(title="WhatsApp AI Assistant", version="1.0.0")
+
+API_SECRET_KEY = os.getenv("API_SECRET_KEY")
+
+async def verify_api_key(request: Request):
+    api_key = request.headers.get("x-api-key")
+    if not api_key or api_key != API_SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Chave de API inválida ou ausente."
+        )
 
 class WhatsAppMessage(BaseModel):
     user_id: int
     message: str
     chat_history: Optional[str] = ""
 
-@app.post("/process_whatsapp_message")
+@app.post("/process_whatsapp_message", dependencies=[Depends(verify_api_key)])
 async def process_whatsapp_message(request: WhatsAppMessage):
     try:
         # Verifica se o Supabase está configurado
