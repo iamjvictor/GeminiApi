@@ -1,11 +1,20 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException, Request, status, Depends
 from pydantic import BaseModel
 from typing import Optional
 from database import supabase
 from gemini import generate_response_with_gemini
 from gemini import process_google_event
-from ExtractFromFile import find_relevant_chunks_from_json
+from ExtractFromFile import process_rag_pipeline
+from knowledge_service import invalidate_cache_for_hotel, get_knowledge_for_hotel
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+import requests
 import os
+from generateChunks import generate_vectorized_chunks
+
 
 app = FastAPI(title="WhatsApp AI Assistant", version="1.0.0")
 
@@ -20,38 +29,27 @@ async def verify_api_key(request: Request):
         )
 
 class WhatsAppMessage(BaseModel):
-    user_id: int
+    user_id: str
     message: str
     chat_history: Optional[str] = ""
+class DocumentToIndex(BaseModel):
+    full_text: str
 
 @app.post("/process_whatsapp_message", dependencies=[Depends(verify_api_key)])
 async def process_whatsapp_message(request: WhatsAppMessage):
     try:
-        # Verifica se o Supabase está configurado
-        if supabase is None:
-            raise HTTPException(
-                status_code=500,
-                detail="Supabase não configurado. Configure as variáveis SUPABASE_URL e SUPABASE_KEY no arquivo .env"
-            )
+    
+        knowledge = get_knowledge_for_hotel(str(request.user_id))
 
-        # Busca dados do usuário no Supabase usando UUID
-        response = (
-            supabase.table("users")
-            .select("pdf_vector")
-            .eq("id", request.user_id)
-            .execute()
-        )
+       
+
+        rag_context = process_rag_pipeline(request.user_id, request.message) 
+
         
-        # Verifica se encontrou dados para o usuário
-        if not response.data:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Usuário com ID {request.user_id} não encontrado"
-            )
-        
-        # Processa os chunks relevantes
-        chunks = find_relevant_chunks_from_json(response.data[0]["pdf_vector"], request.message, 3)
-        response_gemini = generate_response_with_gemini(chunks, request.message, request.chat_history)
+        print(f"Chunks relevantes encontrados: {rag_context}")
+
+        response_gemini = generate_response_with_gemini(rag_context, request.message, request.chat_history,  knowledge)
+      
         
         return {           
             "response_gemini": response_gemini
@@ -75,6 +73,24 @@ async def health_check():
         "supabase_configured": supabase is not None
     }
 
+@app.post("/index-document")
+async def index_document(document: DocumentToIndex):
+    """
+    Endpoint que recebe o texto completo de um documento e retorna os chunks vetorizados.
+    """
+    try:
+        print("🏭 [Fábrica] Recebido novo documento para indexação via API...")
+        # Chama a função principal do nosso novo arquivo
+        vectorized_chunks = generate_vectorized_chunks(document.full_text)
+        return vectorized_chunks
+    except (ValueError, RuntimeError) as e:
+        # Erros esperados (ex: texto vazio)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Erros inesperados
+        print(f"❌ ERRO na fábrica de embeddings: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro interno no serviço de IA: {str(e)}")
+
 
 @app.post("/handleWebhook")
 def handle_webhook(promptPayload: dict):
@@ -93,3 +109,15 @@ def handle_webhook(promptPayload: dict):
             status_code=500,
             detail=f"Erro ao processar webhook: {str(e)}"
         )
+
+
+
+@app.post("/invalidate-cache/{user_id}")
+def invalidate_cache(user_id):
+    # Você pode adicionar uma chave de segurança aqui para garantir que
+    # apenas seu Gateway pode chamar este endpoint.
+    success = invalidate_cache_for_hotel(user_id)
+    if success:
+        return {"message": f"Cache para o usuário {user_id} foi limpo."}, 200
+    else:
+        return {"message": f"Nenhum cache encontrado para o usuário {user_id}."}, 404

@@ -12,64 +12,55 @@ genai.configure(api_key=api_key) # Configura a biblioteca do Google AI com a cha
 
 model = "gemini-2.0-flash" # Linha comentada: Definiria o nome de um modelo específico (não usada no fluxo atual).
 generative_model_instance = genai.GenerativeModel(model) # Linha comentada: Instanciaria um modelo generativo (não usada no fluxo atual).
-def generate_response_with_gemini(relevant_chunks, user_question, chat_history=""):
-    """
-    Gera uma resposta usando o modelo Gemini baseada nos chunks relevantes e na pergunta do usuário.
-    
-    Args:
-        relevant_chunks (list): Lista de tuplas (chunk, score) com os chunks mais relevantes
-        user_question (str): Pergunta do usuário
-        chat_history (str): Histórico da conversa anterior (opcional)
-    
-    Returns:
-        str: Resposta gerada pelo modelo Gemini
-    """
-    if not relevant_chunks:
-        return "Desculpe, não encontrei informações relevantes para responder sua pergunta."
-    
-    # Prepara o contexto combinando os chunks relevantes
-    context = "\n\n".join([chunk for chunk, score in relevant_chunks])
-    
-    # Cria o prompt para o modelo
+
+def generate_response_with_gemini(rag_context: str, user_question: str, chat_history: str, knowledge: dict):
+
+    # Monta o prompt final com todos os contextos
     prompt = f"""
     ### PERSONA E MISSÃO PRINCIPAL ###
-        Você é o "Victor", o Recepcionista Virtual da Pousada Sol & Mar em Cabo Frio. Sua personalidade é proativa, extremamente prestativa, amigável e com um tom leve e solar. Sua missão é garantir que cada hóspede se sinta bem-vindo e tenha suas dúvidas resolvidas da forma mais humana e eficiente possível.
+    Você é o "Alfred", o assistente virtual especialista do hotel. Sua missão é ser extremamente prestativo, preciso e amigável.
 
-        ### REGRAS DE OURO DA CONVERSA (CRÍTICO) ###
-        0.  **Regra de Saudação Condicional (A MAIS IMPORTANTE):**
-            * **SE** o [HISTÓRICO DA CONVERSA] abaixo estiver **VAZIO**, esta é a primeira interação do dia. Comece com uma saudação calorosa e apropriada para o horário (ex: "Olá, bom dia! Sou o Leo, seu assistente virtual da Pousada Sol & Mar. Como posso te ajudar hoje?").
-            * **SE** o [HISTÓRICO DA CONVERSA] **JÁ CONTIVER MENSAGENS**, a conversa já está em andamento. **NÃO USE UMA NOVA SAUDAÇÃO.** Vá direto ao ponto, respondendo à nova pergunta do usuário de forma natural e contextual.
+    ### FONTES DE CONHECIMENTO ###
+    1.  **[CATÁLOGO DE QUARTOS]:** Use esta fonte para responder a perguntas sobre tipos de quarto, o que eles incluem, capacidade e preços.
+        {knowledge.get('contexto_quartos', 'Nenhuma informação de quartos disponível.')}
 
-        1.  **A Fonte da Verdade para Fatos:** Para perguntas sobre regras e serviços da pousada, sua ÚNICA fonte de verdade é o [CONTEXTO]. NUNCA invente horários, preços ou regras.
+    2.  **[INFORMAÇÕES GERAIS DO HOTEL]:** Use esta fonte para responder a perguntas sobre regras, horários e outras informações gerais da estadia.
+        {rag_context}
+    
 
-        2.  **O Detetive Amigável (Perguntas Ambíguas):** Se uma pergunta for vaga (ex: "e o lazer?"), faça perguntas para entender melhor o que o usuário quer saber. ("Claro! Você gostaria de saber sobre as opções de lazer aqui na pousada, ou dicas de passeios em Cabo Frio?")
+    ### HISTÓRICO DA CONVERSA RECENTE ###
+    {chat_history}
 
-        3.  **O Assistente Proativo (Informação Fora do Contexto):** Se a resposta para uma pergunta factual NÃO estiver no [CONTEXTO], JAMAIS diga apenas "não sei". Siga o roteiro:
-            * a. **Seja transparente:** "Ótima pergunta! Eu verifiquei aqui e não tenho essa informação específica."
-            * b. **Ofereça uma solução alternativa:** "Mas posso verificar com a equipe e te retorno em breve, ou posso te passar o contato de um parceiro que pode ajudar. O que prefere?"
-            * c. **Sugira contato humano como último recurso:** "Se o assunto for urgente, posso pedir para um de nossos recepcionistas te ligar."
+    ### NOVA PERGUNTA DO USUÁRIO ###
+    {user_question}
 
-        4.  **Conversa Livre e Empatia:** Você TEM permissão para conversar sobre assuntos gerais para criar conexão (tempo, dicas de praias, etc.), usando seu conhecimento geral.
-
-        ---
-        [CONTEXTO DO HOTEL]
-        {context}
-        ---
-        [HISTÓRICO DA CONVERSA RECENTE]
-        {chat_history}
-        ---
-        [NOVA PERGUNTA DO USUÁRIO]
-        {user_question}
-        ---
+    ### SUA RESPOSTA:
     """
-        
+
+    print("✅ Prompt final montado. Enviando para o Gemini...")
+    # print(prompt) # Descomente esta linha se quiser ver o prompt completo no log
+
     try:
-        # Gera a resposta usando o modelo Gemini
+        # Tenta gerar o conteúdo com a API do Google
         response = generative_model_instance.generate_content(prompt)
-        return response.text
+        print("✅ Resposta recebida do Gemini.", response)
+
+        # --- DEBUG: Verifique se a resposta tem um texto antes de acessá-lo ---
+        if response.parts:
+            final_response = response.text
+        else:
+            # Isso acontece se a API bloquear a resposta por segurança
+            print("❌ A resposta do Gemini foi bloqueada ou veio vazia. Verifique o prompt e os filtros de segurança.")
+            print(f"Detalhes do bloqueio: {response.prompt_feedback}")
+            final_response = "Desculpe, não consegui processar sua pergunta no momento. Poderia reformulá-la?"
+            
+        return final_response
+
     except Exception as e:
-        print(f"Erro ao gerar resposta com Gemini: {e}")
-        return "Desculpe, ocorreu um erro ao processar sua pergunta. Tente novamente."
+        # Captura e imprime o erro específico da API do Gemini
+        print(f"❌ ERRO CRÍTICO AO CHAMAR A API DO GEMINI: {e}")
+        # Retorna uma mensagem de erro genérica para o usuário
+        return "Ocorreu um erro ao me comunicar com a inteligência artificial. Por favor, tente novamente."
 
 
 
