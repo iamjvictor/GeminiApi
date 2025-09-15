@@ -68,13 +68,13 @@ model = genai.GenerativeModel(
 print("Ferramentas e configuração criadas com sucesso!")
 
 
-def chamar_api_disponibilidade(hotel_id: str, check_in_date: str, check_out_date: str):
+def chamar_api_disponibilidade(hotel_id: str, check_in_date: str, check_out_date: str, lead_whatsapp_number: str):
     backend_url = os.getenv("BACKEND_URL")
     api_url = f"{backend_url}/bookings/{hotel_id}/availability-report"
     backend_api_secret = os.getenv("API_SECRET_KEY")
     headers = {"x-api-key": backend_api_secret}
-    params = {"checkIn": check_in_date, "checkOut": check_out_date}
-
+    params = {"checkIn": check_in_date, "checkOut": check_out_date, "leadWhatsappNumber": lead_whatsapp_number  }
+    print(f"🔍 [DEBUG DISPONIBILIDADE] Parâmetros: {params}")
     try:
         response = requests.get(api_url, json=params, headers=headers)
         response.raise_for_status()
@@ -178,7 +178,7 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
         # Obter dados da sessão
         session_data = get_session(lead_whatsapp_number) or {}
         print(f"📋 [SESSÃO INICIAL] Dados para {lead_whatsapp_number}: {json.dumps(session_data, indent=2)}")
-        
+
         # Construir contexto da conversa
         chat_context = ""
         if chat_history:
@@ -324,7 +324,8 @@ def process_function_call(function_call, hotel_id: str, lead_whatsapp_number: st
                 print(f"🔍 [DEBUG DISPONIBILIDADE] Hotel ID: {hotel_id}")
                 print(f"🔍 [DEBUG DISPONIBILIDADE] Check-in: {check_in}")
                 print(f"🔍 [DEBUG DISPONIBILIDADE] Check-out: {check_out}")
-                availability_result = chamar_api_disponibilidade(hotel_id, check_in, check_out)
+                print(f"🔍 [DEBUG DISPONIBILIDADE] Lead WhatsApp Number: {lead_whatsapp_number}")
+                availability_result = chamar_api_disponibilidade(hotel_id, check_in, check_out, lead_whatsapp_number)
                 
                 # Se a resposta é uma lista (formato correto), adicionar metadados
                 if isinstance(availability_result, list):
@@ -377,7 +378,7 @@ def process_function_call(function_call, hotel_id: str, lead_whatsapp_number: st
             update_session(lead_whatsapp_number, {"check_in_date": check_in, "check_out_date": check_out})
             
             # Verificar disponibilidade
-            availability_result = chamar_api_disponibilidade(hotel_id, check_in, check_out)
+            availability_result = chamar_api_disponibilidade(hotel_id, check_in, check_out, lead_whatsapp_number)
             
             # Se a resposta é uma lista (formato correto), adicionar metadados
             if isinstance(availability_result, list):
