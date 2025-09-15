@@ -3,7 +3,7 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request, status, Depends
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict
 from database import supabase
 from gemini import generate_response_with_gemini
 from gemini import process_google_event
@@ -32,26 +32,52 @@ class WhatsAppMessage(BaseModel):
     user_id: str
     message: str
     chat_history: Optional[str] = ""
+    lead_whatsapp_number: Optional[str] = ""
+
 class DocumentToIndex(BaseModel):
     full_text: str
 
+def parse_chat_history(history_string: str) -> List[Dict[str, any]]:
+    if not history_string:
+        return []
+
+    parsed_history = []
+    lines = history_string.strip().split('\n')
+    
+    for line in lines:
+        if line.startswith("Usuário: "):
+            role = "user"
+            text = line.replace("Usuário: ", "").strip()
+        elif line.startswith("Alfred: "):
+            role = "model"
+            text = line.replace("Alfred: ", "").strip()
+        else:
+            continue # Ignora linhas mal formatadas
+
+        parsed_history.append({"role": role, "parts": [{"text": text}]})
+    
+    return parsed_history
+
 @app.post("/process_whatsapp_message", dependencies=[Depends(verify_api_key)])
 async def process_whatsapp_message(request: WhatsAppMessage):
-    try:
     
+    try:
         knowledge = get_knowledge_for_hotel(str(request.user_id))
-
-       
-
         rag_context = process_rag_pipeline(request.user_id, request.message) 
-
         
-        print(f"Chunks relevantes encontrados: {rag_context}")
-
-        response_gemini = generate_response_with_gemini(rag_context, request.message, request.chat_history,  knowledge)
-      
+        # Converte o histórico de string para o formato de lista do Gemini
+        parsed_chat_history = parse_chat_history(request.chat_history)
         
-        return {           
+        response_gemini = generate_response_with_gemini(
+            rag_context=rag_context,
+            user_question=request.message, 
+            chat_history=parsed_chat_history, # Passa o histórico parseado
+            knowledge=knowledge, 
+            hotel_id=request.user_id, 
+            lead_whatsapp_number=request.lead_whatsapp_number
+        )
+
+        return {
             "response_gemini": response_gemini
         }
         
@@ -109,6 +135,7 @@ def handle_webhook(promptPayload: dict):
             status_code=500,
             detail=f"Erro ao processar webhook: {str(e)}"
         )
+
 
 
 

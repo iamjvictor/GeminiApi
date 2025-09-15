@@ -80,7 +80,18 @@ def _format_rooms_for_llm(rooms_json):
         formatted_text += f"  - Descrição: {room.get('description', 'N/A')}\n"
         formatted_text += f"  - Capacidade: Até {room.get('capacity', 'N/A')} pessoas\n"
         formatted_text += f"  - Diária: R$ {room.get('daily_rate', 'N/A')}\n"
-        
+        beds = room.get('beds', [])
+        if beds:
+            bed_descriptions = []
+            for bed in beds:
+                bed_type = bed.get('type', 'Cama')
+                bed_count = bed.get('quantity', 1)
+                # Pluraliza "cama" se necessário
+                if bed_count == 1:
+                    bed_descriptions.append(f"{bed_count} {bed_type}")
+                else:
+                    bed_descriptions.append(f"{bed_count} {bed_type}s")
+            formatted_text += f"  - Camas: {', '.join(bed_descriptions)}\n"
         # Processa a lista de comodidades
         amenities = room.get('amenities', {})
         available_amenities = [key for key, value in amenities.items() if value is True]
