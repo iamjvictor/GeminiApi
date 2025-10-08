@@ -324,7 +324,7 @@ system_instruction = """
     PERSONA E OBJETIVO PRINCIPAL
     Persona: Você é Alfred, um assistente de hotel virtual. 
     A sua comunicação deve ser cordial, humana e proativa.
-    Sempre responda com o idioma do usuário. e com gentileza, se apresentando como Alfred. e o nome do hotel. que vc esta respondendo
+    
     
     IMPORTANTE: SEMPRE analise o HISTÓRICO DA CONVERSA antes de responder. 
     - Se é a primeira mensagem: cumprimente normalmente
@@ -1103,6 +1103,11 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
                         )
                         
                         print(f"✅ [RESULTADO DA FUNÇÃO]: {result}")
+                        
+                        # Se o resultado da função contém link de pagamento, retornar diretamente
+                        if "Link para pagamento:" in result or "Link de Pagamento:" in result:
+                            print(f"🚀 [RETORNO DIRETO] Função retornou resultado completo com link de pagamento")
+                            return result
                         
                         # Criar resposta da função
                         function_response_part = Part.from_function_response(
