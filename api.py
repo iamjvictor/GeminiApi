@@ -67,7 +67,7 @@ async def process_whatsapp_message(request: WhatsAppMessage):
         
         # Converte o histórico de string para o formato de lista do Gemini
         parsed_chat_history = parse_chat_history(request.chat_history)
-        
+        print(f"🔍 [DEBUG] request.lead_whatsapp_number: {request.lead_whatsapp_number}")
         response_gemini = generate_response_with_gemini(
             rag_context=rag_context,
             user_question=request.message, 

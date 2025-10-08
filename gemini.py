@@ -324,6 +324,7 @@ system_instruction = """
     PERSONA E OBJETIVO PRINCIPAL
     Persona: Você é Alfred, um assistente de hotel virtual. 
     A sua comunicação deve ser cordial, humana e proativa.
+    Sempre responda com o idioma do usuário. e com gentileza, se apresentando como Alfred. e o nome do hotel. que vc esta respondendo
     
     IMPORTANTE: SEMPRE analise o HISTÓRICO DA CONVERSA antes de responder. 
     - Se é a primeira mensagem: cumprimente normalmente
@@ -766,7 +767,7 @@ def validar_datas_reserva(check_in_date: str, check_out_date: str) -> dict:
             "error": f"Erro ao validar datas: {str(e)}"
         }
 
-def chamar_api_disponibilidade(hotel_id: str, check_in_date: str, check_out_date: str, lead_whatsapp_number: 'None'):
+def chamar_api_disponibilidade(hotel_id: str, check_in_date: str, check_out_date: str, lead_whatsapp_number:str):
     
     # Validar datas antes de fazer a chamada da API
     validation_result = validar_datas_reserva(check_in_date, check_out_date)
@@ -1317,10 +1318,11 @@ def process_function_call(function_call, hotel_id: str, lead_whatsapp_number: st
             save_session(lead_whatsapp_number, current_session)
             print(f"💾 [REDIS] Dados pessoais salvos: {customer_name}, {customer_email}")
             
-            return f"✅ Dados pessoais salvos com sucesso!\n\n📋 **Resumo:**\n👤 Nome: {customer_name}\n📧 Email: {customer_email}\n\nAgora vou processar sua reserva..."
+            
             current_session = get_session(lead_whatsapp_number) or {}
             
             room_id = args.get("room_type_id") or current_session.get("room_id")
+            room_name = current_session.get("room_name", f"Quarto {room_id}")
             check_in = args.get("check_in_date") or current_session.get("check_in_date")
             check_out = args.get("check_out_date") or current_session.get("check_out_date")
             customer_name = args.get("customer_name") or current_session.get("customer_name")
@@ -1366,7 +1368,7 @@ def process_function_call(function_call, hotel_id: str, lead_whatsapp_number: st
                 
                 
                 clear_session(lead_whatsapp_number)
-                return f"🎉 Reserva criada com sucesso!\n\n🏨 Quarto: {room_id}\n💰 Preço total: R$ {total_price:.2f}\n📅 Check-in: {check_in}\n📅 Check-out: {check_out}\n\n🔗 Link para pagamento: {payment_url}"
+                return f"🎉 Reserva criada com sucesso!\n\n🏨 Quarto: {room_name}\n💰 Preço total: R$ {total_price:.2f}\n📅 Check-in: {check_in}\n📅 Check-out: {check_out}\n\n🔗 Link para pagamento: {payment_url}"
             else:
                 return f"❌ não foi possível criar a reserva. Tente novamente. Lembre que o link de pagamento é válido por apenas 30 minutos após a criação da reserva."
 
@@ -1376,6 +1378,7 @@ def process_function_call(function_call, hotel_id: str, lead_whatsapp_number: st
             current_session = get_session(lead_whatsapp_number) or {}
             
             room_id = args.get("room_type_id") or current_session.get("room_id")
+            room_name = current_session.get("room_name", f"Quarto {room_id}")
             check_in = args.get("check_in_date") or current_session.get("check_in_date")
             check_out = args.get("check_out_date") or current_session.get("check_out_date")
             customer_name = args.get("customer_name") or current_session.get("customer_name")
@@ -1421,7 +1424,7 @@ def process_function_call(function_call, hotel_id: str, lead_whatsapp_number: st
                 
                 
                 clear_session(lead_whatsapp_number)
-                return f"🎉 Reserva criada com sucesso!\n\n🏨 Quarto: {room_id}\n💰 Preço total: R$ {total_price:.2f}\n📅 Check-in: {check_in}\n📅 Check-out: {check_out}\n\n🔗 Link para pagamento: {payment_url}"
+                return f"🎉 Reserva criada com sucesso!\n\n🏨 Quarto: {room_name}\n💰 Preço total: R$ {total_price:.2f}\n📅 Check-in: {check_in}\n📅 Check-out: {check_out}\n\n🔗 Link para pagamento: {payment_url}"
             else:
                 return f"❌ não foi possível criar a reserva. Tente novamente. Lembre que o link de pagamento é válido por apenas 30 minutos após a criação da reserva."
 
