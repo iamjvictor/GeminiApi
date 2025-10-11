@@ -1091,7 +1091,7 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
                     model="gemini-2.5-flash",
                     contents=contents,
                     config=GenerateContentConfig(
-                        cached_content=cache,  # ✅ usa cache diretamente
+                        cached_content=cache.name,  # ✅ usa cache diretamente
                     ),
                 )
             else:
@@ -1113,7 +1113,7 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
                         model="gemini-2.5-flash",
                         contents=contents,
                         config=GenerateContentConfig(
-                            cached_content=cache,  # ✅ usa cache diretamente
+                            cached_content=cache.name,  # ✅ usa cache diretamente
                         ),
                     )
                     print("✅ [CACHE] Sucesso com o novo cache!")
@@ -1222,7 +1222,7 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
                             model="gemini-2.5-flash",
                             contents=contents,
                             config=GenerateContentConfig(
-                                cached_content=cache,  # ✅ usa cache diretamente
+                                cached_content=cache.name,  # ✅ usa cache diretamente
                             ),
                         )
                     else:
