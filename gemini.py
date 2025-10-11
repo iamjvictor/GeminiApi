@@ -540,8 +540,8 @@ def is_cache_valid():
         print("⚠️ [CACHE] Cache não existe")
         return False
     try:
-        # Tentar acessar o cached_content para verificar se está válido
-        _ = cache.cached_content
+        # Verificar se o cache tem o atributo name (que indica que é válido)
+        _ = cache.name
         print("✅ [CACHE] Cache válido")
         return True
     except Exception as e:
@@ -558,7 +558,6 @@ def handle_cache_expiration():
         if new_cache:
             cache = new_cache
             print(f"✅ [CACHE] Cache recriado com sucesso! Nome: {cache.name}")
-            print(f"✅ [CACHE] Cached content: {cache.cached_content}")
             return True
         else:
             print("❌ [CACHE] Falha ao recriar cache!")
@@ -1088,12 +1087,11 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
         try:
             if cache and is_cache_valid():
                 print(f"🔄 [CACHE] Usando cache: {cache.name}")
-                print(f"🔄 [CACHE] Cached content: {cache.cached_content}")
                 response = client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=contents,
                     config=GenerateContentConfig(
-                        cached_content=cache.cached_content,  # ✅ usa cache
+                        cached_content=cache,  # ✅ usa cache diretamente
                     ),
                 )
             else:
@@ -1115,7 +1113,7 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
                         model="gemini-2.5-flash",
                         contents=contents,
                         config=GenerateContentConfig(
-                            cached_content=cache.cached_content,
+                            cached_content=cache,  # ✅ usa cache diretamente
                         ),
                     )
                     print("✅ [CACHE] Sucesso com o novo cache!")
@@ -1220,12 +1218,11 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
                 try:
                     if cache and is_cache_valid():
                         print(f"🔄 [CACHE] Usando cache para resposta final: {cache.name}")
-                        print(f"🔄 [CACHE] Cached content: {cache.cached_content}")
                         final_response = client.models.generate_content(
                             model="gemini-2.5-flash",
                             contents=contents,
                             config=GenerateContentConfig(
-                                cached_content=cache.cached_content,
+                                cached_content=cache,  # ✅ usa cache diretamente
                             ),
                         )
                     else:
@@ -1247,7 +1244,7 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
                                 model="gemini-2.5-flash",
                                 contents=contents,
                                 config=GenerateContentConfig(
-                                    cached_content=cache.cached_content,
+                                    cached_content=cache,  # ✅ usa cache diretamente
                                 ),
                             )
                             print("✅ [CACHE] Sucesso com o novo cache na resposta final!")
