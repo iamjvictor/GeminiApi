@@ -517,15 +517,58 @@ function_declarations = [
         }
     )
 ]
-cache = client.caches.create(
-    model="gemini-2.5-flash",
-    config=CreateCachedContentConfig(
-        system_instruction=system_instruction,
-        tools=[Tool(function_declarations=function_declarations)],
-        ttl="86400s",
-        display_name="bot-de-reservas",
-    ),
-)
+def create_cache():
+    """Cria um novo cache para o Gemini"""
+    try:
+        return client.caches.create(
+            model="gemini-2.5-flash",
+            config=CreateCachedContentConfig(
+                system_instruction=system_instruction,
+                tools=[Tool(function_declarations=function_declarations)],
+                ttl="86400s",
+                display_name="bot-de-reservas",
+            ),
+        )
+    except Exception as e:
+        print(f"❌ [ERRO] Erro ao criar cache: {e}")
+        return None
+
+def is_cache_valid():
+    """Verifica se o cache atual é válido"""
+    global cache
+    if not cache:
+        print("⚠️ [CACHE] Cache não existe")
+        return False
+    try:
+        # Tentar acessar o cached_content para verificar se está válido
+        _ = cache.cached_content
+        print("✅ [CACHE] Cache válido")
+        return True
+    except Exception as e:
+        print(f"⚠️ [CACHE] Cache inválido: {e}")
+        return False
+
+def handle_cache_expiration():
+    """Lida com expiração do cache recriando-o"""
+    global cache
+    print("🔄 [CACHE] Recriando cache...")
+    try:
+        # Criar novo cache
+        new_cache = create_cache()
+        if new_cache:
+            cache = new_cache
+            print(f"✅ [CACHE] Cache recriado com sucesso! Nome: {cache.name}")
+            print(f"✅ [CACHE] Cached content: {cache.cached_content}")
+            return True
+        else:
+            print("❌ [CACHE] Falha ao recriar cache!")
+            return False
+    except Exception as e:
+        print(f"❌ [CACHE] Erro ao recriar cache: {e}")
+        return False
+
+# Criar cache inicial
+cache = create_cache()
 
 
 # Mapear nomes das funções para as implementações
@@ -948,6 +991,13 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
     print(f"🔍 [DEBUG] hotel_id: {hotel_id}")
     current_date = datetime.now().strftime("%Y-%m-%d")
     
+    # Sempre recriar o cache para evitar problemas de expiração
+    print("🔄 [CACHE] Recriando cache para evitar problemas de expiração...")
+    if not handle_cache_expiration():
+        print("❌ [CACHE] Falha ao recriar cache, continuando sem cache")
+    else:
+        print("✅ [CACHE] Cache recriado com sucesso!")
+    
     try:
         # Obter dados da sessão do Redis
         session_data = get_session(lead_whatsapp_number) or {}
@@ -1035,13 +1085,50 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
             )
         ]
   
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=contents,
-            config=GenerateContentConfig(
-                cached_content=cache.name,  # ✅ usa cache
-            ),
-        )
+        try:
+            if cache and is_cache_valid():
+                print(f"🔄 [CACHE] Usando cache: {cache.name}")
+                print(f"🔄 [CACHE] Cached content: {cache.cached_content}")
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=contents,
+                    config=GenerateContentConfig(
+                        cached_content=cache.cached_content,  # ✅ usa cache
+                    ),
+                )
+            else:
+                print("⚠️ [CACHE] Usando modelo sem cache")
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=contents,
+                )
+        except Exception as e:
+            error_str = str(e)
+            print(f"❌ [ERRO] Erro na primeira chamada: {e}")
+            if "expired" in error_str or "INVALID_ARGUMENT" in error_str or "Cache content" in error_str:
+                print(f"🔄 [CACHE EXPIRADO] Detectado erro de cache expirado: {e}")
+                print("🔄 [CACHE] Forçando recriação do cache...")
+                if handle_cache_expiration():
+                    print("🔄 [CACHE] Tentando novamente com o novo cache...")
+                    # Tentar novamente com o novo cache
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=contents,
+                        config=GenerateContentConfig(
+                            cached_content=cache.cached_content,
+                        ),
+                    )
+                    print("✅ [CACHE] Sucesso com o novo cache!")
+                else:
+                    # Se não conseguir recriar o cache, usar sem cache
+                    print("⚠️ [CACHE] Usando modelo sem cache devido à falha na recriação")
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=contents,
+                    )
+            else:
+                print(f"❌ [ERRO] Erro não relacionado ao cache: {e}")
+                raise e
         print(response.usage_metadata)
       
 
@@ -1130,13 +1217,50 @@ def generate_response_with_gemini(rag_context: str, user_question: str, chat_his
                         ))
                 
                 # Gerar resposta final com os resultados das funções
-                final_response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=contents,
-                    config=GenerateContentConfig(
-                        cached_content=cache.name,
-                    ),
-                )
+                try:
+                    if cache and is_cache_valid():
+                        print(f"🔄 [CACHE] Usando cache para resposta final: {cache.name}")
+                        print(f"🔄 [CACHE] Cached content: {cache.cached_content}")
+                        final_response = client.models.generate_content(
+                            model="gemini-2.5-flash",
+                            contents=contents,
+                            config=GenerateContentConfig(
+                                cached_content=cache.cached_content,
+                            ),
+                        )
+                    else:
+                        print("⚠️ [CACHE] Usando modelo sem cache para resposta final")
+                        final_response = client.models.generate_content(
+                            model="gemini-2.5-flash",
+                            contents=contents,
+                        )
+                except Exception as e:
+                    error_str = str(e)
+                    print(f"❌ [ERRO] Erro na segunda chamada: {e}")
+                    if "expired" in error_str or "INVALID_ARGUMENT" in error_str or "Cache content" in error_str:
+                        print(f"🔄 [CACHE EXPIRADO] Detectado erro de cache expirado na resposta final: {e}")
+                        print("🔄 [CACHE] Forçando recriação do cache...")
+                        if handle_cache_expiration():
+                            print("🔄 [CACHE] Tentando novamente com o novo cache...")
+                            # Tentar novamente com o novo cache
+                            final_response = client.models.generate_content(
+                                model="gemini-2.5-flash",
+                                contents=contents,
+                                config=GenerateContentConfig(
+                                    cached_content=cache.cached_content,
+                                ),
+                            )
+                            print("✅ [CACHE] Sucesso com o novo cache na resposta final!")
+                        else:
+                            # Se não conseguir recriar o cache, usar sem cache
+                            print("⚠️ [CACHE] Usando modelo sem cache devido à falha na recriação")
+                            final_response = client.models.generate_content(
+                                model="gemini-2.5-flash",
+                                contents=contents,
+                            )
+                    else:
+                        print(f"❌ [ERRO] Erro não relacionado ao cache: {e}")
+                        raise e
                 
                 # Verificar se há texto na resposta - extrair apenas as partes de texto
                 try:
